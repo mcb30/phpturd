@@ -23,8 +23,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <utime.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/xattr.h>
 #include <selinux/selinux.h>
 #include <dlfcn.h>
@@ -33,7 +36,9 @@
 #define PHPTURD "PHPTURD"
 
 /** Enable debugging */
+#ifndef DEBUG
 #define DEBUG 0
+#endif
 
 /**
  * Check if canonicalised path starts with a given prefix directory
@@ -55,11 +60,12 @@ static inline int path_starts_with ( const char *path, const char *prefix,
  * Convert to a canonical absolute path (ignoring symlinks)
  *
  * @v path		Path
+ * @v func		Wrapped function name (for debugging)
  * @ret canonical	Canonical path, or NULL on error
  *
  * The caller is repsonsible for calling free() on the returned path.
  */
-static char * canonical_path ( const char *path ) {
+static char * canonical_path ( const char *path, const char *func ) {
 	size_t cwd_len;
 	char *cwd;
 	char *result;
@@ -101,7 +107,8 @@ static char * canonical_path ( const char *path ) {
 		if ( DEBUG >= 2 ) {
 			c = *out;
 			*out = '\0';
-			fprintf ( stderr, PHPTURD " %s => %s ", path, result );
+			fprintf ( stderr, PHPTURD " [%s] %s -> %s ",
+				  func, path, result );
 			*out = c;
 			fprintf ( stderr, "%s\n", in );
 		}
@@ -160,11 +167,13 @@ static char * canonical_path ( const char *path ) {
  * Convert to a turdified path
  *
  * @v path		Path
+ * @v func		Wrapped function name (for debugging)
  * @ret turdpath	Turdified path
  *
  * The caller is repsonsible for calling free() on the returned path.
  */
-static char * turdify_path ( const char *path ) {
+static char * turdify_path ( const char *path, const char *func ) {
+	static int ( * orig_access ) ( const char *path, int mode );
 	const char *turd;
 	const char *readonly;
 	const char *writable;
@@ -175,6 +184,16 @@ static char * turdify_path ( const char *path ) {
 	size_t writable_len;
 	size_t max_len;
 
+	/* Get original library functions */
+	if ( ! orig_access ) {
+		orig_access = dlsym ( RTLD_NEXT, "access" );
+		if ( ! orig_access ) {
+			result = NULL;
+			errno = ENOSYS;
+			goto err_dlsym;
+		}
+	}
+
 	/* Check for and parse PHPTURD environment variable */
 	turd = getenv ( PHPTURD );
 	if ( ! turd ) {
@@ -184,7 +203,7 @@ static char * turdify_path ( const char *path ) {
 	readonly = turd;
 	writable = strchr ( readonly, ':' );
 	if ( ! writable ) {
-		fprintf ( stderr, PHPTURD " malformed: %s\n", turd );
+		fprintf ( stderr, PHPTURD " [%s] malformed: %s\n", func, turd );
 		result = strdup ( path );
 		goto err_malformed;
 	}
@@ -193,10 +212,10 @@ static char * turdify_path ( const char *path ) {
 	writable_len = strlen ( writable );
 
 	/* Convert to an absolute path */
-	abspath = canonical_path ( path );
+	abspath = canonical_path ( path, func );
 	if ( ! abspath ) {
-		fprintf ( stderr, PHPTURD " could not canonicalise \"%s\"\n",
-			  path );
+		fprintf ( stderr, PHPTURD " [%s] could not canonicalise "
+			  "\"%s\"\n", func, path );
 		result = NULL;
 		goto err_canonical;
 	}
@@ -208,6 +227,10 @@ static char * turdify_path ( const char *path ) {
 		suffix = &abspath[writable_len];
 	} else {
 		result = strdup ( path );
+		if ( DEBUG >= 1 ) {
+			fprintf ( stderr, PHPTURD " [%s] %s [unmodified]\n",
+				  func, path );
+		}
 		goto no_prefix;
 	}
 
@@ -227,15 +250,15 @@ static char * turdify_path ( const char *path ) {
 	strcpy ( ( result + readonly_len ), suffix );
 
 	/* Construct writable path if readonly path does not exist */
-	if ( access ( result, F_OK ) != 0 ) {
+	if ( orig_access ( result, F_OK ) != 0 ) {
 		strcpy ( result, writable );
 		strcpy ( ( result + writable_len ), suffix );
 	}
 
 	/* Dump debug information */
 	if ( DEBUG >= 1 ) {
-		fprintf ( stderr, PHPTURD " %s => %s => %s\n",
-			  path, abspath, result );
+		fprintf ( stderr, PHPTURD " [%s] %s => %s => %s\n",
+			  func, path, abspath, result );
 	}
 
  err_result:
@@ -244,15 +267,16 @@ static char * turdify_path ( const char *path ) {
  err_canonical:
  err_malformed:
  no_turd:
+ err_dlsym:
 	return result;
 }
 
 /**
  * Turdify a library call taking a single path parameter
  *
- * @v fund		Library function
+ * @v func		Library function
  * @v path		Path
- * @v ...		Remaining arguments
+ * @v ...		Turdified call arguments
  */
 #define turdwrap1( func, path, ... ) do {				\
 	static typeof ( func ) * orig_ ## func = NULL;			\
@@ -260,22 +284,93 @@ static char * turdify_path ( const char *path ) {
 	long ret;							\
 									\
 	/* Get original library function */				\
-	if ( ! orig_ ## func )						\
+	if ( ! orig_ ## func ) {					\
 		orig_ ## func = dlsym ( RTLD_NEXT, #func );		\
+		if ( ! orig_ ## func ) {				\
+			ret = -1;					\
+			errno = ENOSYS;					\
+			goto err_dlsym;					\
+		}							\
+	}								\
 									\
 	/* Turdify path */						\
-	turdpath = turdify_path ( path );				\
-	if ( ! turdpath )						\
-		return -1;						\
+	turdpath = turdify_path ( path, #func );			\
+	if ( ! turdpath ) {						\
+		ret = -1;						\
+		goto err_turdpath;					\
+	}								\
 									\
 	/* Call original library function */				\
 	ret = orig_ ## func ( __VA_ARGS__ );				\
 									\
+	err_turdpath:							\
+									\
 	/* Free turdified path */					\
 	free ( turdpath );						\
 									\
+	err_dlsym:							\
+									\
 	/* Return value from original library function */		\
 	return ret;							\
+									\
+	} while ( 0 )
+
+/**
+ * Turdify a library call taking two path parameters
+ *
+ * @v func		Library function
+ * @v path1		Path one
+ * @v path2		Path two
+ * @v ...		Turdified call arguments
+ */
+#define turdwrap2( func, path1, path2, ... ) do {			\
+	static typeof ( func ) * orig_ ## func = NULL;			\
+	char *turdpath1;						\
+	char *turdpath2;						\
+	long ret;							\
+									\
+	/* Get original library function */				\
+	if ( ! orig_ ## func ) {					\
+		orig_ ## func = dlsym ( RTLD_NEXT, #func );		\
+		if ( ! orig_ ## func ) {				\
+			ret = -1;					\
+			errno = ENOSYS;					\
+			goto err_dlsym;					\
+		}							\
+	}								\
+									\
+	/* Turdify path one */						\
+	turdpath1 = turdify_path ( path1, #func );			\
+	if ( ! turdpath1 ) {						\
+		ret = -1;						\
+		goto err_turdpath1;					\
+	}								\
+									\
+	/* Turdify path two */						\
+	turdpath2 = turdify_path ( path2, #func );			\
+	if ( ! turdpath2 ) {						\
+		ret = -1;						\
+		goto err_turdpath2;					\
+	}								\
+									\
+	/* Call original library function */				\
+	ret = orig_ ## func ( __VA_ARGS__ );				\
+									\
+	err_turdpath2:							\
+									\
+	/* Free turdified path two */					\
+	free ( turdpath2 );						\
+									\
+	err_turdpath1:							\
+									\
+	/* Free turdified path one */					\
+	free ( turdpath1 );						\
+									\
+	err_dlsym:							\
+									\
+	/* Return value from original library function */		\
+	return ret;							\
+									\
 	} while ( 0 )
 
 /*
@@ -292,6 +387,10 @@ int __xstat ( int ver, const char *path, struct stat *buf ) {
 	turdwrap1 ( __xstat, path, ver, turdpath, buf );
 }
 
+int access ( const char *path, int mode ) {
+	turdwrap1 ( access, path, turdpath, mode );
+}
+
 int chdir ( const char *path ) {
 	turdwrap1 ( chdir, path, turdpath );
 }
@@ -302,6 +401,10 @@ int chmod ( const char *path, mode_t mode ) {
 
 int chown ( const char *path, uid_t owner, gid_t group ) {
 	turdwrap1 ( chown, path, turdpath, owner, group );
+}
+
+int creat ( const char *path, mode_t mode ) {
+	turdwrap1 ( creat, path, turdpath, mode );
 }
 
 int getfilecon ( const char *path, security_context_t *con ) {
@@ -326,8 +429,33 @@ ssize_t lgetxattr ( const char *path, const char *name, void *value,
 	turdwrap1 ( lgetxattr, path, turdpath, name, value, size );
 }
 
+int link ( const char *path1, const char *path2 ) {
+	turdwrap2 ( link, path1, path2, turdpath1, turdpath2 );
+}
+
+ssize_t listxattr ( const char *path, char *list, size_t size ) {
+	turdwrap1 ( listxattr, path, turdpath, list, size );
+}
+
+ssize_t llistxattr ( const char *path, char *list, size_t size ) {
+	turdwrap1 ( llistxattr, path, turdpath, list, size );
+}
+
+int lremovexattr ( const char *path, const char *name ) {
+	turdwrap1 ( lremovexattr, path, turdpath, name );
+}
+
+int lsetxattr ( const char *path, const char *name, const void *value,
+		size_t size, int flags ) {
+	turdwrap1 ( lsetxattr, path, turdpath, name, value, size, flags );
+}
+
 int lstat ( const char *path, struct stat *statbuf ) {
 	turdwrap1 ( lstat, path, turdpath, statbuf );
+}
+
+int mkdir ( const char *path, mode_t mode ) {
+	turdwrap1 ( mkdir, path, turdpath, mode );
 }
 
 int open ( const char *path, int flags, mode_t mode ) {
@@ -338,6 +466,43 @@ ssize_t readlink ( const char *path, char *buf, size_t bufsiz ) {
 	turdwrap1 ( readlink, path, turdpath, buf, bufsiz );
 }
 
+int removexattr ( const char *path, const char *name ) {
+	turdwrap1 ( removexattr, path, turdpath, name );
+}
+
+int rename ( const char *path1, const char *path2 ) {
+	turdwrap2 ( rename, path1, path2, turdpath1, turdpath2 );
+}
+
+int rmdir ( const char *path ) {
+	turdwrap1 ( rmdir, path, turdpath );
+}
+
+int setxattr ( const char *path, const char *name, const void *value,
+	       size_t size, int flags ) {
+	turdwrap1 ( setxattr, path, turdpath, name, value, size, flags );
+}
+
 int stat ( const char *path, struct stat *statbuf ) {
 	turdwrap1 ( stat, path, turdpath, statbuf );
+}
+
+int symlink ( const char *path1, const char *path2 ) {
+	turdwrap2 ( symlink, path1, path2, turdpath1, turdpath2 );
+}
+
+int truncate ( const char *path, off_t length ) {
+	turdwrap1 ( truncate, path, turdpath, length );
+}
+
+int unlink ( const char * path ) {
+	turdwrap1 ( unlink, path, turdpath );
+}
+
+int utime ( const char *path, const struct utimbuf *times ) {
+	turdwrap1 ( utime, path, turdpath, times );
+}
+
+int utimes ( const char *path, const struct timeval times[2] ) {
+	turdwrap1 ( utimes, path, turdpath, times );
 }
