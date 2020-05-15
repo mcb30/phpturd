@@ -1,5 +1,5 @@
 Name:		phpturd
-Version:	0.0.3
+Version:	0.0.4
 Release:	1%{?dist}
 Summary:	PHP turd interception library
 License:	GPLv2+
@@ -40,6 +40,9 @@ install -D -m 644 phpturd.conf \
 %{_unitdir}/php-fpm.service.d/%{name}.conf
 
 %changelog
+* Fri May 15 2020 Michael Brown <mbrown@fensystems.co.uk> 0.0.4-1
+- build: Create a GitHub release for tagged commits
+
 * Fri May 15 2020 Michael Brown <mbrown@fensystems.co.uk> 0.0.3-1
 - build: Bump configure.ac version automatically via tito
 - doc: Update README.md to include installation instructions
