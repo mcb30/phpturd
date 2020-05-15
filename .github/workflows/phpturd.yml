@@ -1,0 +1,47 @@
+name: PHP turd
+
+on: [push]
+
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v1
+      - name: Install packages
+        run: |
+          sudo apt update
+          sudo apt install -y -o Acquire::Retries=50 \
+                                 libselinux-dev php-cli bats
+      - name: Autotools
+        run: |
+          ./autogen.sh
+      - name: Configure
+        run: |
+          ./configure
+      - name: Build
+        run: |
+          make
+      - name: Test
+        run: |
+          make check
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          name: tests
+          path: .
+      - name: Distribution
+        run: |
+          make distcheck VERSION=artifact
+      - name: Install
+        run: |
+          make
+          sudo make install
+          sudo ldconfig
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          name: phpturd.tar.gz
+          path: phpturd-artifact.tar.gz
