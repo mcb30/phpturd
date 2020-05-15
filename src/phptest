@@ -14,23 +14,90 @@ setup() {
     mkdir ${DIST} ${SCRATCH}
     cp -a ${srcdir}/dist/* ${DIST}/
     cp -a ${srcdir}/scratch/* ${SCRATCH}/
+    chmod -R u+rw ${DIST} ${SCRATCH}
 }
 
 php() {
     LD_PRELOAD=libphpturd.so /usr/bin/php -n "$@"
 }
 
-@test "file_get_contents" {
+@test "file_exists" {
+    [ "$(php -r "echo(file_exists('${DIST}/app.php'));")" == "1" ]
+    [ "$(php -r "echo(file_exists('${SCRATCH}/app.php'));")" == "1" ]
+    [ "$(php -r "echo(file_exists('${DIST}/config.php'));")" == "1" ]
+    [ "$(php -r "echo(file_exists('${SCRATCH}/config.php'));")" == "1" ]
+    [ "$(php -r "echo(file_exists('${DIST}/nonexistent.php'));")" == "" ]
+    [ "$(php -r "echo(file_exists('${SCRATCH}/nonexistent.php'));")" == "" ]
+}
 
+@test "file_get_contents" {
     php -r "echo(file_get_contents('${DIST}/app.php'));" |
 	diff - ${DIST}/app.php
-
     php -r "echo(file_get_contents('${SCRATCH}/app.php'));" |
 	diff - ${DIST}/app.php
-
     php -r "echo(file_get_contents('${DIST}/config.php'));" |
 	diff - ${SCRATCH}/config.php
-
     php -r "echo(file_get_contents('${SCRATCH}/config.php'));" |
 	diff - ${SCRATCH}/config.php
+    php -r "echo(file_get_contents('${DIST}/both.txt'));" |
+	diff - ${DIST}/both.txt
+    php -r "echo(file_get_contents('${SCRATCH}/both.txt'));" |
+	diff - ${DIST}/both.txt
+}
+
+@test "file_put_contents" {
+
+    php -r "file_put_contents('${DIST}/turd.txt', 'php woz ere');"
+    [ ! -e ${DIST}/turd.txt ]
+    [ -f ${SCRATCH}/turd.txt ]
+    [ "$(cat ${SCRATCH}/turd.txt)" == "php woz ere" ]
+
+    php -r "file_put_contents('${SCRATCH}/app.php', 'update wizrds rule111');"
+    [ -f ${DIST}/app.php ]
+    [ ! -e ${SCRATCH}/app.php ]
+    [ "$(cat ${DIST}/app.php)" == "update wizrds rule111" ]
+
+    php -r "file_put_contents('${DIST}/config.php', 'wot is hygieeen');"
+    [ ! -e ${DIST}/config.php ]
+    [ -f ${SCRATCH}/config.php ]
+    [ "$(cat ${SCRATCH}/config.php)" == "wot is hygieeen" ]
+
+    php -r "file_put_contents('${DIST}/both.txt', 'wheeeeeeeeeee');"
+    [ -f ${DIST}/both.txt ]
+    [ -f ${SCRATCH}/both.txt ]
+    [ "$(cat ${DIST}/both.txt)" == "wheeeeeeeeeee" ]
+}
+
+@test "file" {
+    php -r "echo(implode('', file('${SCRATCH}/app.php')));" |
+	diff - ${DIST}/app.php
+    php -r "echo(implode('', file('${DIST}/config.php')));" |
+	diff - ${SCRATCH}/config.php
+    php -r "echo(implode('', file('${SCRATCH}/both.txt')));" |
+	diff - ${DIST}/both.txt
+}
+
+@test "filesize" {
+    [ "$(php -r "echo(filesize('${DIST}/app.php'));")" == 148 ]
+    [ "$(php -r "echo(filesize('${SCRATCH}/app.php'));")" == 148 ]
+    [ "$(php -r "echo(filesize('${DIST}/config.php'));")" == 77 ]
+    [ "$(php -r "echo(filesize('${SCRATCH}/config.php'));")" == 77 ]
+}
+
+@test "mkdir" {
+    php -r "mkdir('${DIST}/new_module_wizard_barf');"
+    [ ! -e ${DIST}/new_module_wizard_barf ]
+    [ -d ${SCRATCH}/new_module_wizard_barf ]
+}
+
+@test "touch" {
+    php -r "touch('${DIST}/.lockfile_hur_dur_meee_so_safe');"
+    [ ! -e ${DIST}/.lockfile_hur_dur_meee_so_safe ]
+    [ -f ${SCRATCH}/.lockfile_hur_dur_meee_so_safe ]
+}
+
+@test "unlink" {
+    php -r "unlink('${SCRATCH}/app.php');"
+    [ ! -e ${DIST}/app.php ]
+    [ ! -e ${SCRATCH}/app.php ]
 }

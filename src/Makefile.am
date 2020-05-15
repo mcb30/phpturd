@@ -5,4 +5,6 @@ libphpturd_la_LDFLAGS = -ldl
 TESTS = phptest
 EXTRA_DIST = phptest \
 	dist/app.php \
+	dist/both.txt \
+	scratch/both.txt \
 	scratch/config.php
