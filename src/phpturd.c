@@ -41,8 +41,10 @@
 #endif
 
 /* Error return values */
+typedef FILE * FILE_ptr;
 #define int_error_return -1
 #define ssize_t_error_return -1
+#define FILE_ptr_error_return NULL
 
 /**
  * Check if canonicalised path starts with a given prefix directory
@@ -411,6 +413,10 @@ int chown ( const char *path, uid_t owner, gid_t group ) {
 
 int creat ( const char *path, mode_t mode ) {
 	turdwrap1 ( int, creat, path, turdpath, mode );
+}
+
+FILE * fopen ( const char *path, const char *mode ) {
+	turdwrap1 ( FILE_ptr, fopen, path, turdpath, mode );
 }
 
 int getfilecon ( const char *path, security_context_t *con ) {
