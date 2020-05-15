@@ -35,3 +35,5 @@ rm -f %{buildroot}%{_libdir}/*.la
 %{_libdir}/libphpturd.so.*
 
 %changelog
+* Fri May 15 2020 Michael Brown <mbrown@fensystems.co.uk> 0.0.1-1
+- First packaged version
