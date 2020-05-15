@@ -5,7 +5,7 @@
 %endif
 
 Name:		phpturd
-Version:	0.0.5
+Version:	0.0.6
 Release:	1%{?dist}
 Summary:	PHP turd interception library
 License:	GPLv2+
@@ -50,6 +50,9 @@ install -D -m 644 phpturd.conf \
 %{_unitdir}/php-fpm.service.d/%{name}.conf
 
 %changelog
+* Fri May 15 2020 Michael Brown <mbrown@fensystems.co.uk> 0.0.6-1
+- build: Fix building on CentOS
+
 * Fri May 15 2020 Michael Brown <mbrown@fensystems.co.uk> 0.0.5-1
 - build: Add missing BuildRequires for systemd-rpm-macros
 
