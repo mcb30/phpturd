@@ -10,6 +10,7 @@ BuildRequires:	automake
 BuildRequires:	libtool
 BuildRequires:	gcc
 BuildRequires:	libselinux-devel
+Provides:	libphpturd = %{version}-%{release}
 
 %description
 An LD_PRELOAD library that allows for incompetently written PHP code
