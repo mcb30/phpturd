@@ -9,6 +9,7 @@ BuildRequires:	autoconf
 BuildRequires:	automake
 BuildRequires:	libtool
 BuildRequires:	gcc
+BuildRequires:	libselinux-devel
 
 %description
 An LD_PRELOAD library that allows for incompetently written PHP code
