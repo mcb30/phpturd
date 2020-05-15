@@ -1,0 +1,36 @@
+#!/usr/bin/env bats
+
+setup() {
+    export DIST=${BATS_TMPDIR}/dist
+    export SCRATCH=${BATS_TMPDIR}/scratch
+    export PHPTURD=${DIST}:${SCRATCH}
+    export LD_LIBRARY_PATH=.libs
+
+    if [ -z "${srcdir}" ] ; then
+	srcdir=.
+    fi
+
+    rm -rf ${DIST} ${SCRATCH}
+    mkdir ${DIST} ${SCRATCH}
+    cp -a ${srcdir}/dist/* ${DIST}/
+    cp -a ${srcdir}/scratch/* ${SCRATCH}/
+}
+
+php() {
+    LD_PRELOAD=libphpturd.so /usr/bin/php -n "$@"
+}
+
+@test "file_get_contents" {
+
+    php -r "echo(file_get_contents('${DIST}/app.php'));" |
+	diff - ${DIST}/app.php
+
+    php -r "echo(file_get_contents('${SCRATCH}/app.php'));" |
+	diff - ${DIST}/app.php
+
+    php -r "echo(file_get_contents('${DIST}/config.php'));" |
+	diff - ${SCRATCH}/config.php
+
+    php -r "echo(file_get_contents('${SCRATCH}/config.php'));" |
+	diff - ${SCRATCH}/config.php
+}

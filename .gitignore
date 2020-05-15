@@ -1,4 +1,5 @@
 build-aux/
+phpturd-*/
 Makefile.in
 Makefile
 libtool
@@ -7,5 +8,6 @@ autom4te.cache
 stamp-h1
 configure
 configure.scan
-config.*
+/config.*
 *.m4
+*.tar.gz
