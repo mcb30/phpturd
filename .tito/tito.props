@@ -1,6 +1,7 @@
 [buildconfig]
+lib_dir = .tito
 builder = tito.builder.Builder
-tagger = tito.tagger.VersionTagger
+tagger = customtagger.CustomVersionTagger
 tag_commit_message_format = build: Release version %(version)s
 tag_format = v{version}
 changelog_format = %s
