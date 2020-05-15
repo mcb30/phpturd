@@ -23,7 +23,7 @@ within either top-level directory will be mapped as follows:
 The library must be loaded via `LD_PRELOAD` using e.g.
 
 ```shell
-LD_PRELOAD=/usr/lib64/libphpturd.so
+LD_PRELOAD=libphpturd.so
 ```
 
 This can be configured for a PHP runtime environment by creating a
@@ -33,7 +33,7 @@ This can be configured for a PHP runtime environment by creating a
 
 ```ini
 [Service]
-Environment=LD_PRELOAD=/usr/lib64/libphpturd.so
+Environment=LD_PRELOAD=libphpturd.so
 ```
 
 The pair of turd directories is passed via the environment variable
