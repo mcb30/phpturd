@@ -1,5 +1,5 @@
 Name:		phpturd
-Version:	0.0.1
+Version:	0.0.2
 Release:	1%{?dist}
 Summary:	PHP turd interception library
 License:	GPLv2+
@@ -36,5 +36,8 @@ rm -f %{buildroot}%{_libdir}/*.la
 %{_libdir}/libphpturd.so.*
 
 %changelog
+* Fri May 15 2020 Michael Brown <mbrown@fensystems.co.uk> 0.0.2-1
+- build: Add missing RPM BuildRequires
+
 * Fri May 15 2020 Michael Brown <mbrown@fensystems.co.uk> 0.0.1-1
 - First packaged version
