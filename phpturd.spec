@@ -1,3 +1,9 @@
+%define with_systemd_rpm_macros 1
+
+%if 0%{?rhel}
+%define with_systemd_rpm_macros 0
+%endif
+
 Name:		phpturd
 Version:	0.0.5
 Release:	1%{?dist}
@@ -10,8 +16,11 @@ BuildRequires:	automake
 BuildRequires:	libtool
 BuildRequires:	gcc
 BuildRequires:	libselinux-devel
-BuildRequires:	systemd-rpm-macros
 Provides:	libphpturd = %{version}-%{release}
+
+%if 0%{?with_systemd_rpm_macros}
+BuildRequires:	systemd-rpm-macros
+%endif
 
 %description
 An LD_PRELOAD library that allows for incompetently written PHP code
