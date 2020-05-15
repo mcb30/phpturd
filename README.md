@@ -1,12 +1,12 @@
 PHP turd interception library
 =============================
 
-This library was inspired by [SuiteCRM](https://suitecrm.com).
-SuiteCRM's PHP code is written in the style of an enraged toddler
-dribbling onto a keyboard, and fails to understand even basic concepts
-of separating code from data.  Patching the code (along with all
-possible third-party plugin modules) to fix this fundamental design
-flaw is not feasible.
+This library was inspired by [SuiteCRM][suitecrm].  SuiteCRM's PHP
+code is written in the style of an enraged toddler dribbling onto a
+keyboard, and fails to understand even basic concepts of separating
+code from data.  Patching the code (along with all possible
+third-party plugin modules) to fix this fundamental design flaw is not
+feasible.
 
 This library allows for incompetently written PHP code (such as
 SuiteCRM) to be forcibly divided into two top-level "turd"
@@ -50,5 +50,34 @@ allow relative symlinks pointing outside of the turd directories to
 resolve correctly.
 
 Yes, this is hideously ugly.  But it's elegance personified compared
-to anything found in the [SuiteCRM commit
-log](https://github.com/salesagility/SuiteCRM/commits/master).
+to anything found in the [SuiteCRM commit log][suitecrmlog].
+
+Installation from source
+------------------------
+
+The library uses the standard `autotools` build system.  You can build
+the library using the commands:
+
+```shell
+./autogen.sh
+./configure
+make
+```
+
+and install the library using the commands:
+
+```shell
+sudo make install
+sudo ldconfig
+```
+
+Installation from prebuilt RPM
+------------------------------
+
+Prebuilt RPMs for Fedora and CentOS are available from the [Unipart
+Digital COPR repository][copr].
+
+
+[suitecrm]: https://suitecrm.com
+[suitecrmlog]: https://github.com/salesagility/SuiteCRM/commits/master
+[copr]: https://copr.fedorainfracloud.org/coprs/unipartdigital/pkgs/
