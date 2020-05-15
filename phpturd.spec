@@ -1,5 +1,5 @@
 Name:		phpturd
-Version:	0.0.2
+Version:	0.0.3
 Release:	1%{?dist}
 Summary:	PHP turd interception library
 License:	GPLv2+
@@ -40,6 +40,20 @@ install -D -m 644 phpturd.conf \
 %{_unitdir}/php-fpm.service.d/%{name}.conf
 
 %changelog
+* Fri May 15 2020 Michael Brown <mbrown@fensystems.co.uk> 0.0.3-1
+- build: Bump configure.ac version automatically via tito
+- doc: Update README.md to include installation instructions
+- build: Include php-fpm.service.d/phpturd.conf in RPM package
+- build: Include README.md and phpturd.spec in source distribution
+- test: Add test cases using a variety of PHP file-access functions
+- turd: Include wrapper for fopen()
+- turd: Allow for non-integer return types from wrapped functions
+- test: Run tests via GitHub workflow
+- test: Add sketch self-test framework
+- turd: Add hopefully complete list of remaining library call wrappers
+- doc: Suggest using name-only form for LD_PRELOAD
+- build: Add a Provides tag for libphpturd
+
 * Fri May 15 2020 Michael Brown <mbrown@fensystems.co.uk> 0.0.2-1
 - build: Add missing RPM BuildRequires
 
