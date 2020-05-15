@@ -1,5 +1,5 @@
 # Configure autoconf
-AC_INIT([phpturd], [0.0.4], [mbrown@fensystems.co.uk])
+AC_INIT([phpturd], [0.0.5], [mbrown@fensystems.co.uk])
 AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_SRCDIR([src/phpturd.c])
 AC_CONFIG_AUX_DIR([build-aux])
