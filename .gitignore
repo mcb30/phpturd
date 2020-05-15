@@ -1,0 +1,11 @@
+build-aux/
+Makefile.in
+Makefile
+libtool
+autoscan.log
+autom4te.cache
+stamp-h1
+configure
+configure.scan
+config.*
+*.m4
