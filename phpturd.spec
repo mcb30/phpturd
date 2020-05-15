@@ -29,12 +29,15 @@ read-only) and a writable scratch area.
 %install
 %make_install
 rm -f %{buildroot}%{_libdir}/*.la
+install -D -m 644 phpturd.conf \
+	%{buildroot}%{_unitdir}/php-fpm.service.d/%{name}.conf
 
 %files
 %doc README.md
 %license COPYING
 %{_libdir}/libphpturd.so
 %{_libdir}/libphpturd.so.*
+%{_unitdir}/php-fpm.service.d/%{name}.conf
 
 %changelog
 * Fri May 15 2020 Michael Brown <mbrown@fensystems.co.uk> 0.0.2-1
