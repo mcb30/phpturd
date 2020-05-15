@@ -10,6 +10,7 @@ BuildRequires:	automake
 BuildRequires:	libtool
 BuildRequires:	gcc
 BuildRequires:	libselinux-devel
+BuildRequires:	systemd-rpm-macros
 Provides:	libphpturd = %{version}-%{release}
 
 %description
