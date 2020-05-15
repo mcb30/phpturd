@@ -40,6 +40,10 @@
 #define DEBUG 0
 #endif
 
+/* Error return values */
+#define int_error_return -1
+#define ssize_t_error_return -1
+
 /**
  * Check if canonicalised path starts with a given prefix directory
  *
@@ -274,20 +278,21 @@ static char * turdify_path ( const char *path, const char *func ) {
 /**
  * Turdify a library call taking a single path parameter
  *
+ * @v rtype		Return type
  * @v func		Library function
  * @v path		Path
  * @v ...		Turdified call arguments
  */
-#define turdwrap1( func, path, ... ) do {				\
+#define turdwrap1( rtype, func, path, ... ) do {			\
 	static typeof ( func ) * orig_ ## func = NULL;			\
 	char *turdpath;							\
-	long ret;							\
+	rtype ret;							\
 									\
 	/* Get original library function */				\
 	if ( ! orig_ ## func ) {					\
 		orig_ ## func = dlsym ( RTLD_NEXT, #func );		\
 		if ( ! orig_ ## func ) {				\
-			ret = -1;					\
+			ret = rtype ## _error_return;			\
 			errno = ENOSYS;					\
 			goto err_dlsym;					\
 		}							\
@@ -296,7 +301,7 @@ static char * turdify_path ( const char *path, const char *func ) {
 	/* Turdify path */						\
 	turdpath = turdify_path ( path, #func );			\
 	if ( ! turdpath ) {						\
-		ret = -1;						\
+		ret = rtype ## _error_return;				\
 		goto err_turdpath;					\
 	}								\
 									\
@@ -318,22 +323,23 @@ static char * turdify_path ( const char *path, const char *func ) {
 /**
  * Turdify a library call taking two path parameters
  *
+ * @v rtype		Return type
  * @v func		Library function
  * @v path1		Path one
  * @v path2		Path two
  * @v ...		Turdified call arguments
  */
-#define turdwrap2( func, path1, path2, ... ) do {			\
+#define turdwrap2( rtype, func, path1, path2, ... ) do {		\
 	static typeof ( func ) * orig_ ## func = NULL;			\
 	char *turdpath1;						\
 	char *turdpath2;						\
-	long ret;							\
+	rtype ret;							\
 									\
 	/* Get original library function */				\
 	if ( ! orig_ ## func ) {					\
 		orig_ ## func = dlsym ( RTLD_NEXT, #func );		\
 		if ( ! orig_ ## func ) {				\
-			ret = -1;					\
+			ret = rtype ## _error_return;			\
 			errno = ENOSYS;					\
 			goto err_dlsym;					\
 		}							\
@@ -342,14 +348,14 @@ static char * turdify_path ( const char *path, const char *func ) {
 	/* Turdify path one */						\
 	turdpath1 = turdify_path ( path1, #func );			\
 	if ( ! turdpath1 ) {						\
-		ret = -1;						\
+		ret = rtype ## _error_return;				\
 		goto err_turdpath1;					\
 	}								\
 									\
 	/* Turdify path two */						\
 	turdpath2 = turdify_path ( path2, #func );			\
 	if ( ! turdpath2 ) {						\
-		ret = -1;						\
+		ret = rtype ## _error_return;				\
 		goto err_turdpath2;					\
 	}								\
 									\
@@ -380,129 +386,129 @@ static char * turdify_path ( const char *path, const char *func ) {
  */
 
 int __lxstat ( int ver, const char *path, struct stat *buf ) {
-	turdwrap1 ( __lxstat, path, ver, turdpath, buf );
+	turdwrap1 ( int, __lxstat, path, ver, turdpath, buf );
 }
 
 int __xstat ( int ver, const char *path, struct stat *buf ) {
-	turdwrap1 ( __xstat, path, ver, turdpath, buf );
+	turdwrap1 ( int, __xstat, path, ver, turdpath, buf );
 }
 
 int access ( const char *path, int mode ) {
-	turdwrap1 ( access, path, turdpath, mode );
+	turdwrap1 ( int, access, path, turdpath, mode );
 }
 
 int chdir ( const char *path ) {
-	turdwrap1 ( chdir, path, turdpath );
+	turdwrap1 ( int, chdir, path, turdpath );
 }
 
 int chmod ( const char *path, mode_t mode ) {
-	turdwrap1 ( chmod, path, turdpath, mode );
+	turdwrap1 ( int, chmod, path, turdpath, mode );
 }
 
 int chown ( const char *path, uid_t owner, gid_t group ) {
-	turdwrap1 ( chown, path, turdpath, owner, group );
+	turdwrap1 ( int, chown, path, turdpath, owner, group );
 }
 
 int creat ( const char *path, mode_t mode ) {
-	turdwrap1 ( creat, path, turdpath, mode );
+	turdwrap1 ( int, creat, path, turdpath, mode );
 }
 
 int getfilecon ( const char *path, security_context_t *con ) {
-	turdwrap1 ( getfilecon, path, turdpath, con );
+	turdwrap1 ( int, getfilecon, path, turdpath, con );
 }
 
 ssize_t getxattr ( const char *path, const char *name, void *value,
 		   size_t size ) {
-	turdwrap1 ( getxattr, path, turdpath, name, value, size );
+	turdwrap1 ( ssize_t, getxattr, path, turdpath, name, value, size );
 }
 
 int lchown ( const char *path, uid_t owner, gid_t group ) {
-	turdwrap1 ( lchown, path, turdpath, owner, group );
+	turdwrap1 ( int, lchown, path, turdpath, owner, group );
 }
 
 int lgetfilecon ( const char *path, security_context_t *con ) {
-	turdwrap1 ( lgetfilecon, path, turdpath, con );
+	turdwrap1 ( int, lgetfilecon, path, turdpath, con );
 }
 
 ssize_t lgetxattr ( const char *path, const char *name, void *value,
 		    size_t size ) {
-	turdwrap1 ( lgetxattr, path, turdpath, name, value, size );
+	turdwrap1 ( ssize_t, lgetxattr, path, turdpath, name, value, size );
 }
 
 int link ( const char *path1, const char *path2 ) {
-	turdwrap2 ( link, path1, path2, turdpath1, turdpath2 );
+	turdwrap2 ( int, link, path1, path2, turdpath1, turdpath2 );
 }
 
 ssize_t listxattr ( const char *path, char *list, size_t size ) {
-	turdwrap1 ( listxattr, path, turdpath, list, size );
+	turdwrap1 ( ssize_t, listxattr, path, turdpath, list, size );
 }
 
 ssize_t llistxattr ( const char *path, char *list, size_t size ) {
-	turdwrap1 ( llistxattr, path, turdpath, list, size );
+	turdwrap1 ( ssize_t, llistxattr, path, turdpath, list, size );
 }
 
 int lremovexattr ( const char *path, const char *name ) {
-	turdwrap1 ( lremovexattr, path, turdpath, name );
+	turdwrap1 ( int, lremovexattr, path, turdpath, name );
 }
 
 int lsetxattr ( const char *path, const char *name, const void *value,
 		size_t size, int flags ) {
-	turdwrap1 ( lsetxattr, path, turdpath, name, value, size, flags );
+	turdwrap1 ( int, lsetxattr, path, turdpath, name, value, size, flags );
 }
 
 int lstat ( const char *path, struct stat *statbuf ) {
-	turdwrap1 ( lstat, path, turdpath, statbuf );
+	turdwrap1 ( int, lstat, path, turdpath, statbuf );
 }
 
 int mkdir ( const char *path, mode_t mode ) {
-	turdwrap1 ( mkdir, path, turdpath, mode );
+	turdwrap1 ( int, mkdir, path, turdpath, mode );
 }
 
 int open ( const char *path, int flags, mode_t mode ) {
-	turdwrap1 ( open, path, turdpath, flags, mode );
+	turdwrap1 ( int, open, path, turdpath, flags, mode );
 }
 
 ssize_t readlink ( const char *path, char *buf, size_t bufsiz ) {
-	turdwrap1 ( readlink, path, turdpath, buf, bufsiz );
+	turdwrap1 ( ssize_t, readlink, path, turdpath, buf, bufsiz );
 }
 
 int removexattr ( const char *path, const char *name ) {
-	turdwrap1 ( removexattr, path, turdpath, name );
+	turdwrap1 ( int, removexattr, path, turdpath, name );
 }
 
 int rename ( const char *path1, const char *path2 ) {
-	turdwrap2 ( rename, path1, path2, turdpath1, turdpath2 );
+	turdwrap2 ( int, rename, path1, path2, turdpath1, turdpath2 );
 }
 
 int rmdir ( const char *path ) {
-	turdwrap1 ( rmdir, path, turdpath );
+	turdwrap1 ( int, rmdir, path, turdpath );
 }
 
 int setxattr ( const char *path, const char *name, const void *value,
 	       size_t size, int flags ) {
-	turdwrap1 ( setxattr, path, turdpath, name, value, size, flags );
+	turdwrap1 ( int, setxattr, path, turdpath, name, value, size, flags );
 }
 
 int stat ( const char *path, struct stat *statbuf ) {
-	turdwrap1 ( stat, path, turdpath, statbuf );
+	turdwrap1 ( int, stat, path, turdpath, statbuf );
 }
 
 int symlink ( const char *path1, const char *path2 ) {
-	turdwrap2 ( symlink, path1, path2, turdpath1, turdpath2 );
+	turdwrap2 ( int, symlink, path1, path2, turdpath1, turdpath2 );
 }
 
 int truncate ( const char *path, off_t length ) {
-	turdwrap1 ( truncate, path, turdpath, length );
+	turdwrap1 ( int, truncate, path, turdpath, length );
 }
 
 int unlink ( const char * path ) {
-	turdwrap1 ( unlink, path, turdpath );
+	turdwrap1 ( int, unlink, path, turdpath );
 }
 
 int utime ( const char *path, const struct utimbuf *times ) {
-	turdwrap1 ( utime, path, turdpath, times );
+	turdwrap1 ( int, utime, path, turdpath, times );
 }
 
 int utimes ( const char *path, const struct timeval times[2] ) {
-	turdwrap1 ( utimes, path, turdpath, times );
+	turdwrap1 ( int, utimes, path, turdpath, times );
 }
