@@ -252,12 +252,12 @@ static char * turdify_path ( const char *path, const char *func ) {
 		goto err_result;
 
 	/* Construct readonly path variant */
-	strcpy ( result, readonly );
+	memcpy ( result, readonly, readonly_len );
 	strcpy ( ( result + readonly_len ), suffix );
 
 	/* Construct writable path if readonly path does not exist */
 	if ( orig_access ( result, F_OK ) != 0 ) {
-		strcpy ( result, writable );
+		memcpy ( result, writable, writable_len );
 		strcpy ( ( result + writable_len ), suffix );
 	}
 
