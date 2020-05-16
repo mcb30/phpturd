@@ -5,7 +5,7 @@
 %endif
 
 Name:		phpturd
-Version:	0.0.8
+Version:	1.0.0
 Release:	1%{?dist}
 Summary:	PHP turd interception library
 License:	GPLv2+
@@ -50,6 +50,10 @@ install -D -m 644 phpturd.conf \
 %{_unitdir}/php-fpm.service.d/%{name}.conf
 
 %changelog
+* Sat May 16 2020 Michael Brown <mbrown@fensystems.co.uk> 1.0.0-1
+- test: Add test for PHP's tempnam() function
+- turd: Provide wrappers for mktemp() and friends
+
 * Sat May 16 2020 Michael Brown <mbrown@fensystems.co.uk> 0.0.8-1
 - test: Add a test case for implicit directory creation
 - turd: Allow intermediate directories to be created transparently
