@@ -21,10 +21,12 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
 #include <utime.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -480,7 +482,19 @@ int mkdir ( const char *path, mode_t mode ) {
 	turdwrap1 ( int, mkdir, path, turdpath, mode );
 }
 
-int open ( const char *path, int flags, mode_t mode ) {
+int open ( const char *path, int flags, ... ) {
+	int creat = ( flags & O_CREAT );
+	mode_t mode;
+	va_list ap;
+
+	va_start ( ap, flags );
+	if ( creat ) {
+		mode = va_arg ( ap, mode_t );
+	} else {
+		mode = 0;
+	}
+	va_end ( ap );
+
 	turdwrap1 ( int, open, path, turdpath, flags, mode );
 }
 
