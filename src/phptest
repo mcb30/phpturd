@@ -90,6 +90,16 @@ php() {
     [ -d ${SCRATCH}/new_module_wizard_barf ]
 }
 
+@test "tempnam" {
+    distfile=$(php -r "\$tmp = (tempnam('${DIST}', 'prefix'));
+		       file_put_contents(\$tmp, 'temp');
+		       echo(\$tmp);")
+    scratchfile=${SCRATCH}${distfile#${DIST}}
+    [ ! -e ${distfile} ]
+    [ -f ${scratchfile} ]
+    [ "$(cat ${scratchfile})" == "temp" ]
+}
+
 @test "touch" {
     php -r "touch('${DIST}/.lockfile_hur_dur_meee_so_safe');"
     [ ! -e ${DIST}/.lockfile_hur_dur_meee_so_safe ]
