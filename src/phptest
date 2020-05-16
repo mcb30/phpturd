@@ -101,3 +101,18 @@ php() {
     [ ! -e ${DIST}/app.php ]
     [ ! -e ${SCRATCH}/app.php ]
 }
+
+@test "implicit directory creation" {
+    mkdir -p ${DIST}/sub/dir
+    echo -n "hello" > ${DIST}/sub/dir/existing
+    php -r "file_put_contents('${SCRATCH}/sub/dir/existing', 'foo');"
+    [ -d ${DIST}/sub/dir ]
+    [ ! -e ${SCRATCH}/sub/dir ]
+    [ "$(cat ${DIST}/sub/dir/existing)" == "foo" ]
+    php -r "file_put_contents('${SCRATCH}/sub/dir/new', 'bar');"
+    [ -d ${DIST}/sub/dir ]
+    [ -d ${SCRATCH}/sub/dir ]
+    [ "$(stat -c '%#a' ${SCRATCH}/sub)" == "0750" ]
+    [ "$(stat -c '%#a' ${SCRATCH}/sub/dir)" == "0750" ]
+    [ "$(cat ${SCRATCH}/sub/dir/new)" == "bar" ]
+}
