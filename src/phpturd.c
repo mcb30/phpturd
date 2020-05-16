@@ -59,7 +59,9 @@
 #define MKDIR_MODE ( S_IRWXU | S_IRGRP | S_IXGRP )
 
 /* Error return values */
+typedef char * char_ptr;
 typedef FILE * FILE_ptr;
+#define char_ptr_error_return NULL
 #define int_error_return -1
 #define ssize_t_error_return -1
 #define FILE_ptr_error_return NULL
@@ -587,6 +589,26 @@ int lstat ( const char *path, struct stat *statbuf ) {
 
 int mkdir ( const char *path, mode_t mode ) {
 	turdwrap1 ( int, mkdir, path, 1, turdpath, mode );
+}
+
+int mkostemp ( char *path, int flags ) {
+	turdwrap1 ( int, mkostemp, path, 1, turdpath, flags );
+}
+
+int mkostemps ( char *path, int suffixlen, int flags ) {
+	turdwrap1 ( int, mkostemps, path, 1, turdpath, suffixlen, flags );
+}
+
+int mkstemp ( char *path ) {
+	turdwrap1 ( int, mkstemp, path, 1, turdpath );
+}
+
+int mkstemps ( char *path, int suffixlen ) {
+	turdwrap1 ( int, mkstemps, path, 1, turdpath, suffixlen );
+}
+
+char * mktemp ( char *path ) {
+	turdwrap1 ( char_ptr, mktemp, path, 1, turdpath );
 }
 
 int open ( const char *path, int flags, ... ) {
