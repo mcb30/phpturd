@@ -1,4 +1,4 @@
-AM_CFLAGS = -W -Wall -Wextra -Werror
+AM_CFLAGS = -W -Wall -Wextra -Wmissing-prototypes -Werror
 lib_LTLIBRARIES = libphpturd.la
 libphpturd_la_SOURCES = phpturd.c
 libphpturd_la_LDFLAGS = -ldl
