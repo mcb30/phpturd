@@ -5,7 +5,7 @@
 %endif
 
 Name:		phpturd
-Version:	0.0.7
+Version:	0.0.8
 Release:	1%{?dist}
 Summary:	PHP turd interception library
 License:	GPLv2+
@@ -50,6 +50,14 @@ install -D -m 644 phpturd.conf \
 %{_unitdir}/php-fpm.service.d/%{name}.conf
 
 %changelog
+* Sat May 16 2020 Michael Brown <mbrown@fensystems.co.uk> 0.0.8-1
+- test: Add a test case for implicit directory creation
+- turd: Allow intermediate directories to be created transparently
+- turd: Ensure that all library function prototypes are included
+- turd: Include fcntl.h to get the prototype for open()
+- turd: Avoid unnecessary string duplication
+- turd: Replace all uses of strcpy()
+
 * Sat May 16 2020 Michael Brown <mbrown@fensystems.co.uk> 0.0.7-1
 - turd: Use memcpy() to copy fixed-length unterminated strings
 
