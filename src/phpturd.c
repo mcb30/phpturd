@@ -178,7 +178,8 @@ static char * canonical_path ( const char *path, const char *func ) {
  * @v func		Wrapped function name (for debugging)
  * @ret turdpath	Turdified path
  *
- * The caller is repsonsible for calling free() on the returned path.
+ * The caller is repsonsible for calling free() on the returned path
+ * if and only if the pointer value differs from the original path.
  */
 static char * turdify_path ( const char *path, const char *func ) {
 	static int ( * orig_access ) ( const char *path, int mode );
@@ -206,14 +207,14 @@ static char * turdify_path ( const char *path, const char *func ) {
 	/* Check for and parse PHPTURD environment variable */
 	turd = getenv ( PHPTURD );
 	if ( ! turd ) {
-		result = strdup ( path );
+		result = ( ( char * ) path );
 		goto no_turd;
 	}
 	readonly = turd;
 	writable = strchr ( readonly, ':' );
 	if ( ! writable ) {
 		fprintf ( stderr, PHPTURD " [%s] malformed: %s\n", func, turd );
-		result = strdup ( path );
+		result = ( ( char * ) path );
 		goto err_malformed;
 	}
 	readonly_len = ( writable - readonly );
@@ -235,7 +236,7 @@ static char * turdify_path ( const char *path, const char *func ) {
 	} else if ( path_starts_with ( abspath, writable, writable_len ) ) {
 		suffix = &abspath[writable_len];
 	} else {
-		result = strdup ( path );
+		result = ( ( char * ) path );
 		if ( DEBUG >= 1 ) {
 			fprintf ( stderr, PHPTURD " [%s] %s [unmodified]\n",
 				  func, path );
@@ -318,8 +319,9 @@ static char * turdify_path ( const char *path, const char *func ) {
 									\
 	err_turdpath:							\
 									\
-	/* Free turdified path */					\
-	free ( turdpath );						\
+	/* Free turdified path, if applicable */			\
+	if ( turdpath != path )						\
+		free ( turdpath );					\
 									\
 	err_dlsym:							\
 									\
@@ -372,13 +374,15 @@ static char * turdify_path ( const char *path, const char *func ) {
 									\
 	err_turdpath2:							\
 									\
-	/* Free turdified path two */					\
-	free ( turdpath2 );						\
+	/* Free turdified path two, if applicable */			\
+	if ( turdpath2 != path2 )					\
+		free ( turdpath2 );					\
 									\
 	err_turdpath1:							\
 									\
-	/* Free turdified path one */					\
-	free ( turdpath1 );						\
+	/* Free turdified path one, if applicable */			\
+	if ( turdpath1 != path1 )					\
+		free ( turdpath1 );					\
 									\
 	err_dlsym:							\
 									\
