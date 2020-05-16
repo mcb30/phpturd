@@ -42,11 +42,31 @@
 #define DEBUG 0
 #endif
 
+/* Mode for implicitly created directories
+ *
+ * There is no guaranteed safe way to determine the permissions for a
+ * directory created without the application's knowledge.  We could
+ * potentially copy the mode bits from the corresponding readonly
+ * directory, but we are unlikely to be able to set the owner and
+ * group of the created directory to match.  We cannot simply rely on
+ * the umask since the application may suppose that sensitive
+ * directory permissions have been set in advance, so the umask may
+ * not reflect the required permissions for this directory.
+ *
+ * We choose a relatively paranoid mode 0750 for implicitly created
+ * directories.
+ */
+#define MKDIR_MODE ( S_IRWXU | S_IRGRP | S_IXGRP )
+
 /* Error return values */
 typedef FILE * FILE_ptr;
 #define int_error_return -1
 #define ssize_t_error_return -1
 #define FILE_ptr_error_return NULL
+
+/* Original library functions */
+static int ( * orig_access ) ( const char *path, int mode );
+static int ( * orig_mkdir ) ( const char *path, mode_t mode );
 
 /**
  * Check if canonicalised path starts with a given prefix directory
@@ -174,17 +194,77 @@ static char * canonical_path ( const char *path, const char *func ) {
 }
 
 /**
+ * Attempt to create intermediate directories, ignoring failures
+ *
+ * @v path		Canonicalised absolute path
+ * @v top		Top directory (known to already exist)
+ * @v end		End of path
+ *
+ * Allow for attempts to create files within the writable directory in
+ * subdirectories that currently exist only in the readonly directory,
+ * by transparently creating the corresponding subdirectories as
+ * needed.  Optimise for the common case that the subdirectories
+ * already exist and no action is required.
+ */
+static void create_intermediate_dirs ( const char *path, const char *top,
+				       char *end ) {
+	char tmp;
+
+	/* Find parent directory separator, allowing for the fact that
+	 * the initial path may end with a '/'.
+	 */
+	end--;
+	while ( 1 ) {
+		end--;
+		if ( end <= top )
+			goto finished;
+		if ( *end == '/' )
+			break;
+	}
+
+	/* Temporarily truncate path */
+	tmp = *end;
+	*end = '\0';
+
+	/* Do nothing if parent directory already exists */
+	if ( orig_access ( path, F_OK ) == 0 )
+		goto exists;
+
+	/* Recursively ensure that parent directories exist */
+	create_intermediate_dirs ( path, top, end );
+
+	/* Create this directory */
+	if ( orig_mkdir ( path, MKDIR_MODE ) != 0 ) {
+		if ( DEBUG >= 1 ) {
+			fprintf ( stderr, PHPTURD " could not create %s: %s\n",
+				  path, strerror ( errno ) );
+		}
+		/* Ignore failure; minimise surprise by letting errors
+		 * be reported by the original library call that
+		 * subsequently tries to access the file within the
+		 * nonexistent directory.
+		 */
+	}
+
+ exists:
+	/* Restore truncated path */
+	*end = tmp;
+ finished:
+	return;
+}
+
+/**
  * Convert to a turdified path
  *
  * @v path		Path
+ * @v mkdirs		Create intermediate directories if needed
  * @v func		Wrapped function name (for debugging)
  * @ret turdpath	Turdified path
  *
  * The caller is repsonsible for calling free() on the returned path
  * if and only if the pointer value differs from the original path.
  */
-static char * turdify_path ( const char *path, const char *func ) {
-	static int ( * orig_access ) ( const char *path, int mode );
+static char * turdify_path ( const char *path, int mkdirs, const char *func ) {
 	const char *turd;
 	const char *readonly;
 	const char *writable;
@@ -197,9 +277,19 @@ static char * turdify_path ( const char *path, const char *func ) {
 	size_t max_len;
 
 	/* Get original library functions */
-	if ( ! orig_access ) {
+	if ( ! orig_mkdir ) {
+
+		/* Get original access() function */
 		orig_access = dlsym ( RTLD_NEXT, "access" );
 		if ( ! orig_access ) {
+			result = NULL;
+			errno = ENOSYS;
+			goto err_dlsym;
+		}
+
+		/* Get original mkdir() function */
+		orig_mkdir = dlsym ( RTLD_NEXT, "mkdir" );
+		if ( ! orig_mkdir ) {
 			result = NULL;
 			errno = ENOSYS;
 			goto err_dlsym;
@@ -265,9 +355,19 @@ static char * turdify_path ( const char *path, const char *func ) {
 
 	/* Construct writable path if readonly path does not exist */
 	if ( orig_access ( result, F_OK ) != 0 ) {
+
+		/* Construct writable path */
 		memcpy ( result, writable, writable_len );
 		memcpy ( ( result + writable_len ), suffix,
 			 ( suffix_len + 1 /* NUL */ ) );
+
+		/* Ensure that path components exist, if applicable */
+		if ( mkdirs ) {
+			create_intermediate_dirs ( result,
+						   ( result + writable_len ),
+						   ( result + writable_len +
+						     suffix_len ) );
+		}
 	}
 
 	/* Dump debug information */
@@ -292,9 +392,10 @@ static char * turdify_path ( const char *path, const char *func ) {
  * @v rtype		Return type
  * @v func		Library function
  * @v path		Path
+ * @v mkdirs		Create intermediate directories if needed
  * @v ...		Turdified call arguments
  */
-#define turdwrap1( rtype, func, path, ... ) do {			\
+#define turdwrap1( rtype, func, path, mkdirs, ... ) do {		\
 	static typeof ( func ) * orig_ ## func = NULL;			\
 	char *turdpath;							\
 	rtype ret;							\
@@ -310,7 +411,7 @@ static char * turdify_path ( const char *path, const char *func ) {
 	}								\
 									\
 	/* Turdify path */						\
-	turdpath = turdify_path ( path, #func );			\
+	turdpath = turdify_path ( path, mkdirs, #func );		\
 	if ( ! turdpath ) {						\
 		ret = rtype ## _error_return;				\
 		goto err_turdpath;					\
@@ -338,10 +439,13 @@ static char * turdify_path ( const char *path, const char *func ) {
  * @v rtype		Return type
  * @v func		Library function
  * @v path1		Path one
+ * @v mkdirs1		Create path one intermediate directories if needed
  * @v path2		Path two
+ * @v mkdirs2		Create path two intermediate directories if needed
  * @v ...		Turdified call arguments
  */
-#define turdwrap2( rtype, func, path1, path2, ... ) do {		\
+#define turdwrap2( rtype, func, path1, mkdirs1, path2, mkdirs2,		\
+		   ... ) do {						\
 	static typeof ( func ) * orig_ ## func = NULL;			\
 	char *turdpath1;						\
 	char *turdpath2;						\
@@ -358,14 +462,14 @@ static char * turdify_path ( const char *path, const char *func ) {
 	}								\
 									\
 	/* Turdify path one */						\
-	turdpath1 = turdify_path ( path1, #func );			\
+	turdpath1 = turdify_path ( path1, mkdirs1, #func );		\
 	if ( ! turdpath1 ) {						\
 		ret = rtype ## _error_return;				\
 		goto err_turdpath1;					\
 	}								\
 									\
 	/* Turdify path two */						\
-	turdpath2 = turdify_path ( path2, #func );			\
+	turdpath2 = turdify_path ( path2, mkdirs2, #func );		\
 	if ( ! turdpath2 ) {						\
 		ret = rtype ## _error_return;				\
 		goto err_turdpath2;					\
@@ -400,86 +504,89 @@ static char * turdify_path ( const char *path, const char *func ) {
  */
 
 int __lxstat ( int ver, const char *path, struct stat *buf ) {
-	turdwrap1 ( int, __lxstat, path, ver, turdpath, buf );
+	turdwrap1 ( int, __lxstat, path, 0, ver, turdpath, buf );
 }
 
 int __xstat ( int ver, const char *path, struct stat *buf ) {
-	turdwrap1 ( int, __xstat, path, ver, turdpath, buf );
+	turdwrap1 ( int, __xstat, path, 0, ver, turdpath, buf );
 }
 
 int access ( const char *path, int mode ) {
-	turdwrap1 ( int, access, path, turdpath, mode );
+	turdwrap1 ( int, access, path, 0, turdpath, mode );
 }
 
 int chdir ( const char *path ) {
-	turdwrap1 ( int, chdir, path, turdpath );
+	turdwrap1 ( int, chdir, path, 0, turdpath );
 }
 
 int chmod ( const char *path, mode_t mode ) {
-	turdwrap1 ( int, chmod, path, turdpath, mode );
+	turdwrap1 ( int, chmod, path, 0, turdpath, mode );
 }
 
 int chown ( const char *path, uid_t owner, gid_t group ) {
-	turdwrap1 ( int, chown, path, turdpath, owner, group );
+	turdwrap1 ( int, chown, path, 0, turdpath, owner, group );
 }
 
 int creat ( const char *path, mode_t mode ) {
-	turdwrap1 ( int, creat, path, turdpath, mode );
+	turdwrap1 ( int, creat, path, 1, turdpath, mode );
 }
 
 FILE * fopen ( const char *path, const char *mode ) {
-	turdwrap1 ( FILE_ptr, fopen, path, turdpath, mode );
+	turdwrap1 ( FILE_ptr, fopen, path,
+		    ( ( mode[0] == 'w' ) | ( mode[0] == 'a' ) ),
+		    turdpath, mode );
 }
 
 int getfilecon ( const char *path, security_context_t *con ) {
-	turdwrap1 ( int, getfilecon, path, turdpath, con );
+	turdwrap1 ( int, getfilecon, path, 0, turdpath, con );
 }
 
 ssize_t getxattr ( const char *path, const char *name, void *value,
 		   size_t size ) {
-	turdwrap1 ( ssize_t, getxattr, path, turdpath, name, value, size );
+	turdwrap1 ( ssize_t, getxattr, path, 0, turdpath, name, value, size );
 }
 
 int lchown ( const char *path, uid_t owner, gid_t group ) {
-	turdwrap1 ( int, lchown, path, turdpath, owner, group );
+	turdwrap1 ( int, lchown, path, 0, turdpath, owner, group );
 }
 
 int lgetfilecon ( const char *path, security_context_t *con ) {
-	turdwrap1 ( int, lgetfilecon, path, turdpath, con );
+	turdwrap1 ( int, lgetfilecon, path, 0, turdpath, con );
 }
 
 ssize_t lgetxattr ( const char *path, const char *name, void *value,
 		    size_t size ) {
-	turdwrap1 ( ssize_t, lgetxattr, path, turdpath, name, value, size );
+	turdwrap1 ( ssize_t, lgetxattr, path, 0, turdpath, name, value, size );
 }
 
 int link ( const char *path1, const char *path2 ) {
-	turdwrap2 ( int, link, path1, path2, turdpath1, turdpath2 );
+	turdwrap2 ( int, link, path1, 0, path2, 1, turdpath1, turdpath2 );
 }
 
 ssize_t listxattr ( const char *path, char *list, size_t size ) {
-	turdwrap1 ( ssize_t, listxattr, path, turdpath, list, size );
+	turdwrap1 ( ssize_t, listxattr, path, 0, turdpath, list, size );
 }
 
 ssize_t llistxattr ( const char *path, char *list, size_t size ) {
-	turdwrap1 ( ssize_t, llistxattr, path, turdpath, list, size );
+	turdwrap1 ( ssize_t, llistxattr, path, 0, turdpath, list, size );
 }
 
 int lremovexattr ( const char *path, const char *name ) {
-	turdwrap1 ( int, lremovexattr, path, turdpath, name );
+	turdwrap1 ( int, lremovexattr, path, 0, turdpath, name );
 }
 
 int lsetxattr ( const char *path, const char *name, const void *value,
 		size_t size, int flags ) {
-	turdwrap1 ( int, lsetxattr, path, turdpath, name, value, size, flags );
+	turdwrap1 ( int, lsetxattr, path, 0, turdpath, name, value, size,
+		    flags );
 }
 
 int lstat ( const char *path, struct stat *statbuf ) {
-	turdwrap1 ( int, lstat, path, turdpath, statbuf );
+	turdwrap1 ( int, lstat, path, 0, turdpath, statbuf );
 }
 
 int mkdir ( const char *path, mode_t mode ) {
-	turdwrap1 ( int, mkdir, path, turdpath, mode );
+	turdwrap1 ( int, mkdir, path, 1, turdpath, mode );
 }
 
 int open ( const char *path, int flags, ... ) {
@@ -495,50 +602,51 @@ int open ( const char *path, int flags, ... ) {
 	}
 	va_end ( ap );
 
-	turdwrap1 ( int, open, path, turdpath, flags, mode );
+	turdwrap1 ( int, open, path, creat, turdpath, flags, mode );
 }
 
 ssize_t readlink ( const char *path, char *buf, size_t bufsiz ) {
-	turdwrap1 ( ssize_t, readlink, path, turdpath, buf, bufsiz );
+	turdwrap1 ( ssize_t, readlink, path, 0, turdpath, buf, bufsiz );
 }
 
 int removexattr ( const char *path, const char *name ) {
-	turdwrap1 ( int, removexattr, path, turdpath, name );
+	turdwrap1 ( int, removexattr, path, 0, turdpath, name );
 }
 
 int rename ( const char *path1, const char *path2 ) {
-	turdwrap2 ( int, rename, path1, path2, turdpath1, turdpath2 );
+	turdwrap2 ( int, rename, path1, 0, path2, 1, turdpath1, turdpath2 );
 }
 
 int rmdir ( const char *path ) {
-	turdwrap1 ( int, rmdir, path, turdpath );
+	turdwrap1 ( int, rmdir, path, 0, turdpath );
 }
 
 int setxattr ( const char *path, const char *name, const void *value,
 	       size_t size, int flags ) {
-	turdwrap1 ( int, setxattr, path, turdpath, name, value, size, flags );
+	turdwrap1 ( int, setxattr, path, 0, turdpath, name, value, size,
+		    flags );
 }
 
 int stat ( const char *path, struct stat *statbuf ) {
-	turdwrap1 ( int, stat, path, turdpath, statbuf );
+	turdwrap1 ( int, stat, path, 0, turdpath, statbuf );
 }
 
 int symlink ( const char *path1, const char *path2 ) {
-	turdwrap2 ( int, symlink, path1, path2, turdpath1, turdpath2 );
+	turdwrap2 ( int, symlink, path1, 0, path2, 1, turdpath1, turdpath2 );
 }
 
 int truncate ( const char *path, off_t length ) {
-	turdwrap1 ( int, truncate, path, turdpath, length );
+	turdwrap1 ( int, truncate, path, 0, turdpath, length );
 }
 
 int unlink ( const char * path ) {
-	turdwrap1 ( int, unlink, path, turdpath );
+	turdwrap1 ( int, unlink, path, 0, turdpath );
 }
 
 int utime ( const char *path, const struct utimbuf *times ) {
-	turdwrap1 ( int, utime, path, turdpath, times );
+	turdwrap1 ( int, utime, path, 0, turdpath, times );
 }
 
 int utimes ( const char *path, const struct timeval times[2] ) {
-	turdwrap1 ( int, utimes, path, turdpath, times );
+	turdwrap1 ( int, utimes, path, 0, turdpath, times );
 }
