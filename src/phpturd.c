@@ -73,6 +73,7 @@ static inline int path_starts_with ( const char *path, const char *prefix,
  */
 static char * canonical_path ( const char *path, const char *func ) {
 	size_t cwd_len;
+	size_t path_len;
 	char *cwd;
 	char *result;
 	const char *in;
@@ -91,18 +92,19 @@ static char * canonical_path ( const char *path, const char *func ) {
 	}
 
 	/* Allocate result path */
-	result = malloc ( cwd_len + 1 /* possible '/' */ + strlen ( path )
-			  + 1 /* NUL */ );
+	path_len = strlen ( path );
+	result = malloc ( cwd_len + 1 /* '/' */ + path_len + 1 /* NUL */ );
 	if ( ! result )
 		goto err_result;
 
 	/* Construct result path */
 	if ( cwd ) {
-		strcpy ( result, cwd );
+		memcpy ( result, cwd, cwd_len );
 		result[cwd_len] = '/';
-		strcpy ( ( result + cwd_len + 1 ), path );
+		memcpy ( ( result + cwd_len + 1 ), path,
+			 ( path_len + 1 /* NUL */ ) );
 	} else {
-		strcpy ( result, path );
+		memcpy ( result, path, ( path_len + 1 ) );
 	}
 
 	/* Canonicalise result */
@@ -188,6 +190,7 @@ static char * turdify_path ( const char *path, const char *func ) {
 	char *result;
 	size_t readonly_len;
 	size_t writable_len;
+	size_t suffix_len;
 	size_t max_len;
 
 	/* Get original library functions */
@@ -244,7 +247,8 @@ static char * turdify_path ( const char *path, const char *func ) {
 	max_len = readonly_len;
 	if ( max_len < writable_len )
 		max_len = writable_len;
-	max_len += strlen ( suffix );
+	suffix_len = strlen ( suffix );
+	max_len += suffix_len;
 
 	/* Allocate result path */
 	result = malloc ( max_len + 1 /* NUL */ );
@@ -253,12 +257,14 @@ static char * turdify_path ( const char *path, const char *func ) {
 
 	/* Construct readonly path variant */
 	memcpy ( result, readonly, readonly_len );
-	strcpy ( ( result + readonly_len ), suffix );
+	memcpy ( ( result + readonly_len ), suffix,
+		 ( suffix_len + 1 /* NUL */ ) );
 
 	/* Construct writable path if readonly path does not exist */
 	if ( orig_access ( result, F_OK ) != 0 ) {
 		memcpy ( result, writable, writable_len );
-		strcpy ( ( result + writable_len ), suffix );
+		memcpy ( ( result + writable_len ), suffix,
+			 ( suffix_len + 1 /* NUL */ ) );
 	}
 
 	/* Dump debug information */
