@@ -308,8 +308,10 @@ static char * turdify_path ( const char *path, int mkdirs, const char *func ) {
 		/* Check for and parse PHPTURD environment variable */
 		turd = getenv ( PHPTURD );
 		if ( ! turd ) {
-			fprintf ( stderr, PHPTURD " [%s] no turd found\n",
-				  func );
+			if ( DEBUG >= 1 ) {
+				fprintf ( stderr, PHPTURD " [%s] no turd "
+					  "found\n", func );
+			}
 			result = ( ( char * ) path );
 			goto no_turd;
 		}
@@ -320,8 +322,10 @@ static char * turdify_path ( const char *path, int mkdirs, const char *func ) {
 		}
 		writable = strchr ( readonly, ':' );
 		if ( ! writable ) {
-			fprintf ( stderr, PHPTURD " [%s] malformed: %s\n",
-				  func, readonly );
+			if ( DEBUG >= 1 ) {
+				fprintf ( stderr, PHPTURD " [%s] malformed: "
+					  "%s\n", func, readonly );
+			}
 			result = ( ( char * ) path );
 			goto err_malformed;
 		}
@@ -342,8 +346,10 @@ static char * turdify_path ( const char *path, int mkdirs, const char *func ) {
 	/* Convert to an absolute path */
 	abspath = canonical_path ( path, func );
 	if ( ! abspath ) {
-		fprintf ( stderr, PHPTURD " [%s] could not canonicalise "
-			  "\"%s\"\n", func, path );
+		if ( DEBUG >= 1 ) {
+			fprintf ( stderr, PHPTURD " [%s] could not "
+				  "canonicalise \"%s\"\n", func, path );
+		}
 		result = NULL;
 		goto err_canonical;
 	}
