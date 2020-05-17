@@ -27,6 +27,7 @@
 #include <utime.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -60,10 +61,12 @@
 
 /* Error return values */
 typedef char * char_ptr;
+typedef DIR * DIR_ptr;
 typedef FILE * FILE_ptr;
 #define char_ptr_error_return NULL
 #define int_error_return -1
 #define ssize_t_error_return -1
+#define DIR_ptr_error_return NULL
 #define FILE_ptr_error_return NULL
 
 /* Original library functions */
@@ -625,6 +628,10 @@ int open ( const char *path, int flags, ... ) {
 	va_end ( ap );
 
 	turdwrap1 ( int, open, path, creat, turdpath, flags, mode );
+}
+
+DIR * opendir ( const char *path ) {
+	turdwrap1 ( DIR_ptr, opendir, path, 0, turdpath );
 }
 
 ssize_t readlink ( const char *path, char *buf, size_t bufsiz ) {
