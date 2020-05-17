@@ -270,19 +270,24 @@ static void create_intermediate_dirs ( const char *path, const char *top,
  * if and only if the pointer value differs from the original path.
  */
 static char * turdify_path ( const char *path, int mkdirs, const char *func ) {
+	static int used;
+	static const char *readonly;
+	static const char *writable;
+	static size_t readonly_len;
+	static size_t writable_len;
+	static size_t max_prefix_len;
 	const char *turd;
-	const char *readonly;
-	const char *writable;
 	const char *suffix;
 	char *abspath;
 	char *result;
-	size_t readonly_len;
-	size_t writable_len;
 	size_t suffix_len;
 	size_t max_len;
 
-	/* Get original library functions */
-	if ( ! orig_mkdir ) {
+	/* Perform initialisation on first use */
+	if ( ! used ) {
+
+		/* Record that initialisation has been attempted */
+		used = 1;
 
 		/* Get original access() function */
 		orig_access = dlsym ( RTLD_NEXT, "access" );
@@ -299,24 +304,40 @@ static char * turdify_path ( const char *path, int mkdirs, const char *func ) {
 			errno = ENOSYS;
 			goto err_dlsym;
 		}
+
+		/* Check for and parse PHPTURD environment variable */
+		turd = getenv ( PHPTURD );
+		if ( ! turd ) {
+			fprintf ( stderr, PHPTURD " [%s] no turd found\n",
+				  func );
+			result = ( ( char * ) path );
+			goto no_turd;
+		}
+		readonly = strdup ( turd );
+		if ( ! readonly ) {
+			result = NULL;
+			goto err_strdup;
+		}
+		writable = strchr ( readonly, ':' );
+		if ( ! writable ) {
+			fprintf ( stderr, PHPTURD " [%s] malformed: %s\n",
+				  func, readonly );
+			result = ( ( char * ) path );
+			goto err_malformed;
+		}
+		readonly_len = ( writable - readonly );
+		writable++;
+		writable_len = strlen ( writable );
+		max_prefix_len = readonly_len;
+		if ( max_prefix_len < writable_len )
+			max_prefix_len = writable_len;
 	}
 
-	/* Check for and parse PHPTURD environment variable */
-	turd = getenv ( PHPTURD );
-	if ( ! turd ) {
+	/* Bypass everything if initialisation did not find a valid PHPTURD */
+	if ( ! max_prefix_len ) {
 		result = ( ( char * ) path );
-		goto no_turd;
+		goto bypass;
 	}
-	readonly = turd;
-	writable = strchr ( readonly, ':' );
-	if ( ! writable ) {
-		fprintf ( stderr, PHPTURD " [%s] malformed: %s\n", func, turd );
-		result = ( ( char * ) path );
-		goto err_malformed;
-	}
-	readonly_len = ( writable - readonly );
-	writable++;
-	writable_len = strlen ( writable );
 
 	/* Convert to an absolute path */
 	abspath = canonical_path ( path, func );
@@ -342,11 +363,8 @@ static char * turdify_path ( const char *path, int mkdirs, const char *func ) {
 	}
 
 	/* Calculate maximum result path length */
-	max_len = readonly_len;
-	if ( max_len < writable_len )
-		max_len = writable_len;
 	suffix_len = strlen ( suffix );
-	max_len += suffix_len;
+	max_len = ( max_prefix_len + suffix_len );
 
 	/* Allocate result path */
 	result = malloc ( max_len + 1 /* NUL */ );
@@ -385,7 +403,9 @@ static char * turdify_path ( const char *path, int mkdirs, const char *func ) {
  no_prefix:
 	free ( abspath );
  err_canonical:
+ bypass:
  err_malformed:
+ err_strdup:
  no_turd:
  err_dlsym:
 	return result;
