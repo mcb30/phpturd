@@ -5,7 +5,7 @@
 %endif
 
 Name:		phpturd
-Version:	1.0.2
+Version:	1.0.3
 Release:	1%{?dist}
 Summary:	PHP turd interception library
 License:	GPLv2+
@@ -50,6 +50,9 @@ install -D -m 644 phpturd.conf \
 %{_unitdir}/php-fpm.service.d/%{name}.conf
 
 %changelog
+* Sun May 17 2020 Michael Brown <mbrown@fensystems.co.uk> 1.0.3-1
+- turd: Silence all output at debug level zero
+
 * Sun May 17 2020 Michael Brown <mbrown@fensystems.co.uk> 1.0.2-1
 - turd: Check for PHPTURD environment variable only once
 
